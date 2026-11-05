@@ -1920,6 +1920,13 @@ export default function App() {
                     <TouchableOpacity
                       accessibilityRole="button"
                       style={[styles.guideSettingsButton, {borderColor: cardColors.borderColor}]}
+                      onPress={async () => await NativeModules.SyncBridge.openSetup()}
+                    >
+                      <Text style={actionText}>Setup checklist and status</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      style={[styles.guideSettingsButton, {borderColor: cardColors.borderColor}]}
                       onPress={async () => await notifee.openBatteryOptimizationSettings()}
                     >
                       <Text style={actionText}>Battery optimization settings</Text>

@@ -288,6 +288,14 @@ The owner asked for sensitive clips to last 5 minutes on every device. This is w
 - **Integration tests and APK builds belong on GitHub Actions.** A Gradle run with a test server on the 3.7 GB Pi that hosts the real server left under 200 MB free and timed out, so it was stopped.
   - A second attempt, unit tests only with no test server, also dropped below the 250 MB safety limit and was aborted during Gradle configuration. **So `clipcascade-core` has not been compiled or run yet.** Only `generate_fixtures.py` has run. Phase 1 isn't finished until CI passes.
 
+## 13. Capture status
+
+The app-op polling and accessibility triggers from section 6.5 are **not built**. Whether either can work depends on the phone, so the Setup screen and log come first and show what actually happens on the A54.
+
+- **Built:** the Shizuku listener, the keyboard-switch fallback triggered from logcat, the Quick Settings tile, the notification action and the share target.
+- **Known gap:** after a reboot and before Shizuku is back, automatic capture stays off until the app is opened (section 6.2). This is the plan's Phase 6 reboot test, which will not pass as written. Manual sending still works, and the Shizuku fork with auto-start in section 6.5 is the first thing to try.
+- **Behaviour change:** received files are saved to Downloads straight away, instead of waiting for a tap on a notification.
+
 ## Phase 0 test note
 
 The server test used a temporary container, `clipcascade-recon-tmp`, bound to `127.0.0.1:18091` with default credentials, removed afterwards. The real server container and its data were only read.
