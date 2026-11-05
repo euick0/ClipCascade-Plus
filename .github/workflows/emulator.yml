@@ -1,0 +1,65 @@
+name: Emulator end-to-end
+
+on:
+  push:
+    branches: [main, 'plus/**']
+    paths:
+      - 'ClipCascade_Mobile/src/**'
+      - '.github/workflows/emulator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: npm, cache-dependency-path: ClipCascade_Mobile/src/package-lock.json }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install pycryptodome websocket-client
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Prepare a test signing key
+        working-directory: ClipCascade_Mobile/src/android
+        run: |
+          # This APK is only for this run, so it doesn't use the release key.
+          keytool -genkeypair -keystore app/test.jks -storetype PKCS12 -alias test -keyalg RSA -keysize 2048 \
+            -validity 3 -dname "CN=test" -storepass testtest -keypass testtest
+          cp gradle.properties.ci gradle.properties
+          {
+            echo "MYAPP_UPLOAD_STORE_FILE=test.jks"
+            echo "MYAPP_UPLOAD_KEY_ALIAS=test"
+            echo "MYAPP_UPLOAD_STORE_PASSWORD=testtest"
+            echo "MYAPP_UPLOAD_KEY_PASSWORD=testtest"
+          } >> gradle.properties
+      - working-directory: ClipCascade_Mobile/src
+        run: npm ci
+      - name: Build the release APK for x86_64
+        working-directory: ClipCascade_Mobile/src/android
+        run: ./gradlew --no-daemon assembleRelease -PreactNativeArchitectures=x86_64
+      - name: Run the test on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: python ClipCascade_Mobile/src/android/e2e/emulator_test.py ClipCascade_Mobile/src/android/app/build/outputs/apk/release/app-release.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: e2e-out/

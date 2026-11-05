@@ -209,6 +209,7 @@ class SyncService : Service(), SyncEngineListener {
             try {
                 capture?.ignoreNextChange()
                 val files = applier.apply(clip)
+                SyncLog.log("Applied a received ${clip.type.wireName} clip")
                 if (files > 0) notifyFilesSaved(files)
             } catch (e: Exception) {
                 // For example, Android's binder limit on large clipboard items.
