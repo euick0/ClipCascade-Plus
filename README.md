@@ -2,7 +2,19 @@
 >
 > An unofficial Android fork of [ClipCascade](https://github.com/Sathvik-Rao/ClipCascade) by Sathvik Rao. It aims to stay connected and sync on its own, and it works with the unmodified ClipCascade server and desktop clients. It is not affiliated with or supported by the original project, and it is licensed under GPL-3.0 like the original.
 >
-> **Status: in development, and not tested on a phone yet.** Design notes are in [NOTES.md](NOTES.md). The rest of this README is the original project's.
+> **Status: in development, and not tested on a phone yet.** Design notes are in [NOTES.md](NOTES.md), and the test plan is in [TESTING.md](TESTING.md).
+>
+> **Builds:** each push to `main` builds a signed APK, available from that run in the Actions tab. A `plus-vX.Y.Z` tag also publishes a GitHub Release. The version comes from the tag.
+>
+> **Signing setup for your own fork:**
+> ```
+> keytool -genkeypair -keystore clipcascade-plus.jks -storetype PKCS12 -alias clipcascade-plus -keyalg RSA -keysize 4096 -validity 36500
+> base64 -w0 clipcascade-plus.jks | gh secret set ANDROID_KEYSTORE_BASE64
+> gh secret set ANDROID_KEYSTORE_PASSWORD
+> ```
+> Back up the keystore and its password. Android only installs updates signed with the same key, so if you lose them you must uninstall the app and set it up again.
+>
+> The rest of this README is the original project's.
 
 # <img src="https://github.com/user-attachments/assets/710bb1c3-0eda-48cf-819a-e066bde3a3ec" alt="ClipCascade Logo" width="34" /> ClipCascade
 

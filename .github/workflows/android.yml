@@ -3,9 +3,9 @@ name: Android APK
 on:
   push:
     branches: [main, 'plus/**']
-    paths:
-      - 'ClipCascade_Mobile/src/**'
-      - '.github/workflows/android.yml'
+    tags: ['plus-v*']
+    paths-ignore:
+      - '**.md'
   workflow_dispatch:
 
 permissions:
@@ -15,24 +15,92 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      name: ${{ steps.version.outputs.name }}
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0, fetch-tags: true }
       - uses: actions/setup-node@v4
         with: { node-version: '20', cache: npm, cache-dependency-path: ClipCascade_Mobile/src/package-lock.json }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
-      - name: Prepare gradle.properties
+      - name: Derive the version from the newest plus-v tag
+        id: version
+        run: |
+          set -euo pipefail
+          # plus-vX.Y.Z gives code X*1000000 + Y*10000 + Z*100. Each commit after a tag adds 1 (up to 99).
+          tag=$(git describe --tags --abbrev=0 --match 'plus-v[0-9]*' 2>/dev/null || echo plus-v0.0.0)
+          IFS=. read -r major minor patch <<< "${tag#plus-v}"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            distance=$(git rev-list --count "$tag..HEAD")
+          else
+            distance=$(git rev-list --count HEAD)
+          fi
+          [ "$distance" -gt 99 ] && step=99 || step=$distance
+          code=$(( major*1000000 + minor*10000 + patch*100 + step ))
+          [ "$code" -ge 1 ] || code=1
+          name="$major.$minor.$patch"
+          [ "$distance" -eq 0 ] || name="$name-dev.$distance"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Version $name, code $code"
+      - name: Set up release signing
         working-directory: ClipCascade_Mobile/src/android
-        run: cp gradle.properties.ci gradle.properties
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [ -n "$KEYSTORE_BASE64" ] || { echo "ANDROID_KEYSTORE_BASE64 is not set. See README."; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > app/release.jks
+          cp gradle.properties.ci gradle.properties
+          {
+            echo "MYAPP_UPLOAD_STORE_FILE=release.jks"
+            echo "MYAPP_UPLOAD_KEY_ALIAS=clipcascade-plus"
+            echo "MYAPP_UPLOAD_STORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "MYAPP_UPLOAD_KEY_PASSWORD=$KEYSTORE_PASSWORD"
+          } >> gradle.properties
       - name: Install JS dependencies
         working-directory: ClipCascade_Mobile/src
         run: npm ci
-      - name: Build debug-signed APK for arm64
+      - name: Build the signed release APK for arm64
         working-directory: ClipCascade_Mobile/src/android
-        run: ./gradlew --no-daemon assembleDebug -PreactNativeArchitectures=arm64-v8a
+        run: >
+          ./gradlew --no-daemon assembleRelease
+          -PreactNativeArchitectures=arm64-v8a
+          -PPLUS_VERSION_CODE=${{ steps.version.outputs.code }}
+          -PPLUS_VERSION_NAME=${{ steps.version.outputs.name }}
+      - name: Name the APK and check its signature
+        run: |
+          set -euo pipefail
+          src=ClipCascade_Mobile/src/android/app/build/outputs/apk/release/app-release.apk
+          cp "$src" "ClipCascade-Plus-${{ steps.version.outputs.name }}.apk"
+          "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --print-certs "$src" | grep 'SHA-256'
+      - name: Remove signing material
+        if: always()
+        working-directory: ClipCascade_Mobile/src/android
+        run: rm -f app/release.jks gradle.properties
       - uses: actions/upload-artifact@v4
         with:
-          name: clipcascade-plus-debug
-          path: ClipCascade_Mobile/src/android/app/build/outputs/apk/debug/*.apk
+          name: clipcascade-plus-apk
+          path: ClipCascade-Plus-*.apk
           if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/plus-v')
+    needs: apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: clipcascade-plus-apk }
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # 0.x versions are marked as pre-releases.
+          case "$TAG" in plus-v0.*) pre=--prerelease ;; *) pre= ;; esac
+          gh release create "$TAG" ClipCascade-Plus-*.apk -R "$GITHUB_REPOSITORY" --generate-notes $pre

@@ -84,8 +84,9 @@ android {
         applicationId "com.clipcascade.plus"
         minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 30401
-        versionName "3.4.1"
+        // Set by CI from git tags. See .github/workflows/android.yml.
+        versionCode((project.findProperty('PLUS_VERSION_CODE') ?: '1') as Integer)
+        versionName project.findProperty('PLUS_VERSION_NAME') ?: '0.0.0-local'
     }
     signingConfigs {
         debug {
