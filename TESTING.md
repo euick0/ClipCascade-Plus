@@ -11,11 +11,22 @@
 
 None of this runs on Android. Everything below needs the phone.
 
+## What the emulator test covers
+
+`Emulator end-to-end` runs the release build on stock Android 15 against the official server. It logs in through the real UI, then checks:
+
+- Clips both ways, through the phone's clipboard and the desktop client's code.
+- Recovery after `kill -9`, a server restart, airplane mode and a swipe from recents.
+- Starting and connecting after a real reboot, without opening the app.
+
+It doesn't cover One UI, Samsung's battery management, Android 16, Shizuku or the 5-minute expiry timer on the device.
+
 ## Before you test
 
 1. Install the APK. Log in with the same username, password and salt settings as your other devices.
 2. In the app, open **Setup checklist and status**, or tap **Status** on the notification. Complete every item you can.
-3. Note the **Copy capture** line. It tells you which provider is running.
+3. If READ_LOGS is granted, Android asks to "access all device logs" when sync starts with the app open. Choose **Allow one-time access**, or the logcat trigger stays silent. It may ask again after each reboot.
+4. Note the **Copy capture** line. It tells you which provider is running.
 
 To report a failure, tap **Share log** on the same screen. The log never contains clip content or passwords.
 

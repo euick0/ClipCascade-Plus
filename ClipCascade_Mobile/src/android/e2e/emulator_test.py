@@ -173,6 +173,11 @@ def main():
     tap_text("Start sync")
     connected = wait(lambda: "Connected" in log(), 90)
     snap("4-started")
+    # With READ_LOGS granted, Android asks about log access while the app is on top.
+    time.sleep(3)
+    if find_text("Don’t allow") is not None:
+        print("Android showed the log access prompt", flush=True)
+        tap_text("Don’t allow")
     if not step("Service connects", connected, log()[-300:] if not connected else ""):
         return
     step("Service runs as a foreground service", "isForeground=true" in shell(f"dumpsys activity services {PKG}"))
@@ -229,7 +234,8 @@ def main():
     shell("input keyevent KEYCODE_RECENT_APPS")
     time.sleep(3)
     snap("6-recents")
-    shell("input swipe 540 1200 540 100 200")
+    width, height = map(int, re.search(r"(\d+)x(\d+)", shell("wm size")).groups())
+    shell(f"input swipe {width // 2} {height // 2} {width // 2} {height // 20} 200")
     removed = wait(lambda: "Task removed" in log(), 20)
     step("Swipe from recents reaches the service", removed)
     time.sleep(10)
