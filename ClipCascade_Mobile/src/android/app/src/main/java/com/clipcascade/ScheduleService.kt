@@ -45,6 +45,11 @@ class ScheduleService(context: Context, workerParams: WorkerParameters) : Corout
 
         // show notification if foreground service is not running
         try {
+            // Native sync restarts itself through SyncWatchdogWorker, so "tap to restart" doesn't apply.
+            if (com.clipcascade.sync.SyncService.isWanted(applicationContext)) {
+                removeNotificationIfPresent(applicationContext)
+                return Result.success()
+            }
             if(hasNotificationPermission(applicationContext)) {
                 val bridgeData = AsyncStorageBridge(applicationContext)
                 if(enableForegroundService(bridgeData)) {

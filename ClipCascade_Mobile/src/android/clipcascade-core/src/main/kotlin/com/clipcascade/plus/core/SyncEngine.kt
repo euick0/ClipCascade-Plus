@@ -102,8 +102,14 @@ class SyncEngine(
         transmit(clip)
     }
 
-    /** Sends whatever the guard's rules allow, for manual sends that should repeat. */
-    fun sendClipForced(clip: Clip) = post { transmit(clip) }
+    /**
+     * Sends even if this content was sent before, for manual sends. It still goes through the guard,
+     * so the echo is recognised and the clip counts as the newest for sensitive expiry.
+     */
+    fun sendClipForced(clip: Clip) = post {
+        guard.shouldSend(clip.type, clip.content)
+        transmit(clip)
+    }
 
     /**
      * Sensitive-clip expiry: true means [clipHash] is still the newest clip, and an empty clip has

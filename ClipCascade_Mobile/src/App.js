@@ -535,8 +535,12 @@ export default function App() {
         if (wsIsRunning_s === null) {
           wsIsRunning_s = 'false';
         }
+        // Native sync (P2S) has no JS heartbeat. Starting it is safe if it's already running.
+        if (wsIsRunning_s === 'true' && data_s.server_mode !== 'P2P') {
+          await NativeModules.SyncBridge.start();
+        }
         // check if foreground service is running
-        if (wsIsRunning_s === 'true') {
+        if (wsIsRunning_s === 'true' && data_s.server_mode === 'P2P') {
           let foregroundServiceIsActive = false;
 
           setLoadingPageMessage('Checking foreground service...');
@@ -770,6 +774,9 @@ export default function App() {
   const logout = async () => {
     try {
       setWsPageMessage('⌛ Please wait...');
+      await NativeModules.SyncBridge.forget();
+      await setDataInAsyncStorage('sync_requested', 'false');
+      await setDataInAsyncStorage('wsIsRunning', 'false');
       await stopServiceRun(NativeBridgeModule);
       await setDataInAsyncStorage('password', '');
       if (wsIsRunning === 'true') {
@@ -872,9 +879,18 @@ export default function App() {
           await setDataInAsyncStorage('wsStatusMessage', '');
           await setDataInAsyncStorage('p2pStatusMessage', '');
           setWsPageMessage('🚀 Starting foreground service...');
-          await onDisplayNotification();
+          if (data.server_mode === 'P2P') {
+            await onDisplayNotification();
+          } else {
+            await setDataInAsyncStorage('sync_requested', 'true');
+            await setDataInAsyncStorage('wsIsRunning', 'true');
+            await NativeModules.SyncBridge.start();
+          }
         } else {
           setWsPageMessage('⌛ Stopping foreground service...');
+          await NativeModules.SyncBridge.stop();
+          await setDataInAsyncStorage('sync_requested', 'false');
+          await setDataInAsyncStorage('wsIsRunning', 'false');
           await stopServiceRun(NativeBridgeModule);
           setWsPageMessage('');
           setWsPageP2PMessage('');
@@ -1114,6 +1130,16 @@ export default function App() {
         } else {
           await setDataInAsyncStorage('password', '');
         }
+        // Native sync logs in by itself after restarts. It stores this hash and the derived key,
+        // never the raw password.
+        await NativeModules.SyncBridge.saveLogin({
+          serverUrl: data_s.server_url,
+          username: data_s.username,
+          loginHash: password_s,
+          encryptionKey: data_s.cipher_enabled === 'true' ? data_s.hashed_password : '',
+          maxBytes: String(data_s.max_clipboard_size_local_limit_bytes || data_s.maxsize || ''),
+        });
+
         // Remove password from memory
         setPassword('');
         password_s = '';
