@@ -9,6 +9,9 @@ class PermissionGrantService : IPermissionGrantService.Stub() {
         val commands = listOf(
             listOf("appops", "set", "--user", userId.toString(), BuildConfig.APPLICATION_ID,
                 "SYSTEM_ALERT_WINDOW", "allow"),
+            // For the keyboard-switch fallback.
+            listOf("pm", "grant", "--user", userId.toString(), BuildConfig.APPLICATION_ID,
+                "android.permission.WRITE_SECURE_SETTINGS"),
             // READ_LOGS changes supplementary groups, so Android can kill the app
             // immediately. Do this last, after overlay access has been configured.
             listOf("pm", "grant", "--user", userId.toString(), BuildConfig.APPLICATION_ID,
