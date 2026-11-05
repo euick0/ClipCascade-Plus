@@ -44,8 +44,16 @@ interface ClipListener {
 class ClipCascadeClient(baseUrl: String, private val okHttp: OkHttpClient, private val config: Config = Config()) {
     data class Config(
         val connectTimeoutMillis: Long = 20_000,
-        /** The server beats every 20 s, so silence longer than this means the connection is dead. */
-        val readDeadlineMillis: Long = 30_000,
+        /**
+         * WebSocket ping every this often. A missing pong fails the socket by the next ping, so a
+         * half-dead connection is noticed within two intervals. This is the fast detector.
+         */
+        val pingIntervalMillis: Long = 15_000,
+        /**
+         * Backstop only. Gaps between the server's "20 s" heartbeats have been seen above 30 s, so a
+         * shorter deadline would drop healthy connections.
+         */
+        val readDeadlineMillis: Long = 50_000,
         val deadlineCheckMillis: Long = 5_000,
     )
 
@@ -76,7 +84,7 @@ class ClipConnection internal constructor(
     private val listener: ClipListener,
     private val config: ClipCascadeClient.Config,
 ) {
-    private val socketClient = okHttp.newBuilder().pingInterval(15, TimeUnit.SECONDS).readTimeout(0, TimeUnit.MILLISECONDS).build()
+    private val socketClient = okHttp.newBuilder().pingInterval(config.pingIntervalMillis, TimeUnit.MILLISECONDS).readTimeout(0, TimeUnit.MILLISECONDS).build()
     private val ended = AtomicBoolean(false)
     private val ready = CountDownLatch(1)
     private var openFailure: ConnectFailure? = null
@@ -84,6 +92,10 @@ class ClipConnection internal constructor(
     private var deadlineChecker: ScheduledExecutorService? = null
 
     @Volatile private var lastInboundNanos = System.nanoTime()
+
+    /** Longest gap seen between inbound frames. Tests report it to track the real heartbeat timing. */
+    @Volatile internal var longestSilenceMillis = 0L
+        private set
 
     internal fun open() {
         val wsUrl = baseUrl.replaceFirst(Regex("^http", RegexOption.IGNORE_CASE), "ws") + "/clipsocket"
@@ -159,7 +171,9 @@ class ClipConnection internal constructor(
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) = handle(bytes.toByteArray())
 
         private fun handle(raw: ByteArray) {
-            lastInboundNanos = System.nanoTime()
+            val now = System.nanoTime()
+            longestSilenceMillis = maxOf(longestSilenceMillis, TimeUnit.NANOSECONDS.toMillis(now - lastInboundNanos))
+            lastInboundNanos = now
             val frame = StompFrame.parse(raw) ?: return
             when (frame.command) {
                 "CONNECTED" -> {

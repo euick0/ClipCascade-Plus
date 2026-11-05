@@ -252,7 +252,7 @@ Denials log `Denying clipboard access to <pkg>...`, including when a change noti
 1. **Credentials:** auto re-login needs only the SHA3-512 login hash, and decryption needs only the derived key. Store those two in Keystore-backed storage, **never the raw password**. Existing `hashed_password` handling migrates to it. Changing the password means logging in again.
 2. **"Never stop retrying" needs an exception for bad credentials.** The server has brute-force lockouts (`CC_MAX_ATTEMPTS_PER_IP` 30, `CC_LOCK_TIMEOUT_SECONDS` 60, scaling up). On "bad credentials", retry slowly, on the order of every 30 min, and show a notification. Network and server errors keep the 60 s cap.
 3. **Session detection:** treat a redirect to `/login` on discovery or the WS handshake as "re-login", with redirects disabled for those calls. The plan's 401/403 trigger would never fire.
-4. **Dead-connection detection under 30 s:** a read deadline of about 30 s on the server's 20 s heartbeat, plus OkHttp `pingInterval`. Needs testing through a reverse-proxy tunnel **[UNVERIFIED]**.
+4. **Dead-connection detection under 30 s:** OkHttp `pingInterval` of 15 s is the fast detector. A 50 s read deadline on server frames is only a backstop. The originally proposed 30 s deadline was wrong: CI showed a healthy idle connection going 30 s with no server frame, because the "20 s" server heartbeat can gap by more than that. Ping behaviour through a reverse-proxy tunnel still needs testing **[UNVERIFIED]**.
 5. **Missed clips:** keep the latest unsent phone clip and send it on reconnect, unless a newer clip has arrived from the server.
 6. **Phase 6 needs you:** I can run the server-side integration tests, but every phone test needs you or a connected device.
 

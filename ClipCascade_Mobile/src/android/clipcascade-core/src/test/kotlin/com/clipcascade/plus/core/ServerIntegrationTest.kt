@@ -101,15 +101,33 @@ class ServerIntegrationTest {
         } finally { sender.close(); receiver.close() }
     }
 
-    @Test fun `server heartbeats keep the read deadline satisfied`() {
+    @Test fun `an idle healthy connection stays up with the default timings`() {
         val a = Collector()
-        val config = ClipCascadeClient.Config(readDeadlineMillis = 30_000, deadlineCheckMillis = 1_000)
-        val c = ClipCascadeClient(url, http, config)
+        val c = client()
         val connection = c.connect(c.authenticate(creds, null), creds, a)
         try {
-            assertNull(a.disconnects.poll(35, TimeUnit.SECONDS), "connection should stay up past the deadline")
+            assertNull(a.disconnects.poll(130, TimeUnit.SECONDS), "connection should stay up while idle")
             assertTrue(connection.isOpen)
+            println("Longest gap between server frames: ${connection.longestSilenceMillis} ms")
+            assertTrue(connection.longestSilenceMillis < ClipCascadeClient.Config().readDeadlineMillis)
         } finally { connection.close() }
+    }
+
+    @Test fun `half-dead connection is noticed within about 30 s`() {
+        FreezingProxy(url).use { proxy ->
+            val a = Collector()
+            val c = ClipCascadeClient(proxy.url, http)
+            val connection = c.connect(c.authenticate(creds, null), creds, a)
+            Thread.sleep(1_000)
+            proxy.freeze()
+            val started = System.nanoTime()
+            val (reason, expired) = assertNotNull(a.disconnects.poll(45, TimeUnit.SECONDS), "not noticed in 45 s")
+            val seconds = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started)
+            println("Half-dead connection noticed after $seconds s: $reason")
+            assertFalse(expired)
+            assertFalse(connection.isOpen)
+            assertTrue(seconds <= 32, "took $seconds s")
+        }
     }
 
     @Test fun `silence past the read deadline is reported as a dead connection`() {
@@ -164,4 +182,41 @@ class ServerIntegrationTest {
             assertEquals(0, p.exitValue())
         } finally { c.close() }
     }
+}
+
+/** Forwards TCP until frozen, then keeps sockets open and drops traffic, like a dead network path. */
+private class FreezingProxy(target: String) : AutoCloseable {
+    private val targetUri = java.net.URI(target)
+    private val server = java.net.ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())
+    private val sockets = java.util.concurrent.CopyOnWriteArrayList<java.net.Socket>()
+    @Volatile private var frozen = false
+    val url = "http://127.0.0.1:${server.localPort}"
+
+    init {
+        thread {
+            while (!server.isClosed) {
+                val inbound = runCatching { server.accept() }.getOrNull() ?: break
+                val outbound = java.net.Socket(targetUri.host, targetUri.port)
+                sockets += inbound; sockets += outbound
+                pump(inbound, outbound); pump(outbound, inbound)
+            }
+        }
+    }
+
+    private fun pump(from: java.net.Socket, to: java.net.Socket) = thread {
+        val buffer = ByteArray(16_384)
+        runCatching {
+            while (true) {
+                val n = from.getInputStream().read(buffer)
+                if (n < 0) { if (!frozen) to.shutdownOutput(); break }
+                if (!frozen) { to.getOutputStream().write(buffer, 0, n); to.getOutputStream().flush() }
+            }
+        }
+    }
+
+    private fun thread(body: () -> Unit) = Thread(body).apply { isDaemon = true; start() }
+
+    fun freeze() { frozen = true }
+
+    override fun close() { server.close(); sockets.forEach { runCatching { it.close() } } }
 }
