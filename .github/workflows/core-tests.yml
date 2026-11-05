@@ -1,0 +1,55 @@
+name: Protocol compatibility
+
+on:
+  push:
+    branches: [main, 'plus/**']
+    paths:
+      - 'ClipCascade_Mobile/src/android/clipcascade-core/**'
+      - 'ClipCascade_Desktop/src/utils/cipher_manager.py'
+      - 'ClipCascade_Desktop/src/stomp_ws/**'
+      - '.github/workflows/core-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # The official, unmodified server.
+      clipcascade:
+        image: sathvikrao/clipcascade:latest
+        ports: ['18092:8080']
+        env:
+          CC_MAX_MESSAGE_SIZE_IN_MiB: '1'
+          CC_P2P_ENABLED: 'false'
+    env:
+      CC_TEST_SERVER_URL: http://127.0.0.1:18092
+      CC_TEST_USERNAME: admin
+      CC_TEST_PASSWORD: admin123
+      CC_KOTLIN_FIXTURE_OUT: ${{ github.workspace }}/kotlin-fixtures.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install pycryptodome websocket-client
+      - name: Wait for the server
+        run: timeout 180 bash -c 'until curl -sf -o /dev/null http://127.0.0.1:18092/login; do sleep 3; done'
+      - name: Unit, fixture and integration tests
+        working-directory: ClipCascade_Mobile/src/android/clipcascade-core
+        env:
+          CC_DESKTOP_PEER_CMD: python ${{ github.workspace }}/ClipCascade_Mobile/src/android/clipcascade-core/compat/desktop_peer.py
+        run: ../gradlew --no-daemon test
+      - name: Desktop code decrypts clips encrypted by Kotlin
+        working-directory: ClipCascade_Mobile/src/android/clipcascade-core/compat
+        run: python verify_kotlin_fixtures.py "$CC_KOTLIN_FIXTURE_OUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-test-report
+          path: ClipCascade_Mobile/src/android/clipcascade-core/build/reports/tests/
