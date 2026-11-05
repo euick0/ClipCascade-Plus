@@ -192,7 +192,9 @@ def main():
     except subprocess.TimeoutExpired:
         receiver.kill()
         step("Sends the clipboard, which desktop code decrypts", False, "timed out")
-    # Later steps would match the old text.
+    # Lets network reports settle, so counts below only move because of what each step does.
+    time.sleep(10)
+    step("Connects once on start, without a needless reconnect", log().count("Reconnect requested") == 0 and log().split("Applied a received")[0].count("Connected") == 1, log()[:300])
     before = count("Connected")
 
     # Process death: the system should bring a sticky service back.
@@ -214,18 +216,37 @@ def main():
     step("Shows no network in airplane mode", lost)
     shell("cmd connectivity airplane-mode disable")
     step("Reconnects when the network returns", wait(lambda: count("Connected") > before, 90, 3))
-    before = count("Connected")
+
+    # The setup screen, with Shizuku absent.
+    shell(f"am start -W -n {PKG}/com.clipcascade.sync.SetupActivity")
+    step("Setup screen opens", wait(lambda: find_text("Status") is not None, 20))
+    snap("5-setup")
+    shell("input keyevent KEYCODE_BACK")
 
     # Swiping from recents is close to what Samsung does to background apps.
-    shell(f"am stack remove $(am stack list | grep {PKG} | sed -E 's/.*taskId=([0-9]+).*/\\1/' | head -1) 2>/dev/null")
+    shell(f"monkey -p {PKG} -c android.intent.category.LAUNCHER 1")
     time.sleep(5)
-    step("Service survives leaving the app", shell(f"pidof {PKG}").strip() != "")
+    shell("input keyevent KEYCODE_RECENT_APPS")
+    time.sleep(3)
+    snap("6-recents")
+    shell("input swipe 540 1200 540 100 200")
+    removed = wait(lambda: "Task removed" in log(), 20)
+    step("Swipe from recents reaches the service", removed)
+    time.sleep(10)
+    shell("input keyevent KEYCODE_HOME")
+    step("Service still runs after the swipe", "isForeground=true" in shell(f"dumpsys activity services {PKG}"))
 
-    # Boot receiver, without a full reboot.
-    shell(f"am force-stop {PKG}")
-    time.sleep(2)
-    shell(f"am broadcast -a android.intent.action.BOOT_COMPLETED -p {PKG}")
-    step("Starts by itself on the boot broadcast", wait(lambda: count("Connected") > before, 90, 3), log()[-300:])
+    # A real reboot, without opening the app afterwards.
+    started, connected = count("Service started"), count("Connected")
+    adb("reboot")
+    time.sleep(10)
+    adb("wait-for-device", timeout=240)
+    wait(lambda: shell("getprop sys.boot_completed").strip() == "1", 240, 3)
+    adb("root")
+    time.sleep(3)
+    adb("wait-for-device", timeout=60)
+    came_back = wait(lambda: count("Service started") > started and count("Connected") > connected, 180, 3)
+    step("Starts and connects by itself after a real reboot", came_back, log()[-400:])
 
     step("Log holds no clip text", text not in log())
     step("No crash", "FATAL EXCEPTION" not in adb("logcat", "-d", "-b", "crash"))

@@ -54,6 +54,7 @@ class SyncService : Service(), SyncEngineListener {
     private var restartAlreadyQueued = false
     private var lastText = "Starting…"
     private var defaultNetwork: Network? = null
+    private var networkReported = false
     private val countdown = object : Runnable {
         override fun run() {
             val state = engine?.state
@@ -92,7 +93,7 @@ class SyncService : Service(), SyncEngineListener {
             }
             ACTION_WATCHDOG -> {
                 ensureEngine()
-                if (engine?.state !is SyncState.Connected) engine?.reconnectNow("watchdog")
+                engine?.ensureConnected()
             }
             else -> ensureEngine()
         }
@@ -259,9 +260,15 @@ class SyncService : Service(), SyncEngineListener {
 
             private fun changed(network: Network) {
                 if (network == defaultNetwork) return
+                val first = !networkReported
+                networkReported = true
                 defaultNetwork = network
-                SyncLog.log("Default network changed")
-                engine?.onNetworkChanged(true)
+                if (first) {
+                    engine?.onInitialNetwork()
+                } else {
+                    SyncLog.log("Default network changed")
+                    engine?.onNetworkChanged(true)
+                }
             }
         }
         // The callback fires right away with the current network, if there is one.

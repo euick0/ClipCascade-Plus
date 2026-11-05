@@ -96,6 +96,28 @@ class SyncEngine(
         }
     }
 
+    /**
+     * The first network report after starting describes the network already in use. An open
+     * connection is fine, so this only connects if there isn't one.
+     */
+    fun onInitialNetwork() = post {
+        networkAvailable = true
+        if (running && connection == null) {
+            policy.reset()
+            attempt()
+        }
+    }
+
+    /** From the watchdog. Leaves a healthy connection, or one being made, alone. */
+    fun ensureConnected() = post {
+        if (running && connection?.isOpen != true) {
+            listener.log("Watchdog found no connection")
+            policy.reset()
+            closeConnection()
+            attempt()
+        }
+    }
+
     /** Called by capture providers. Dedupes, then sends now or keeps the clip for reconnection. */
     fun sendClip(clip: Clip) = post {
         if (!guard.shouldSend(clip.type, clip.content)) return@post
