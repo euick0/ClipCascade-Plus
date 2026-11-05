@@ -97,10 +97,6 @@ class ClipConnection internal constructor(
     @Volatile internal var longestSilenceMillis = 0L
         private set
 
-    /** Longest gap seen between inbound frames. Tests report it to track the real heartbeat timing. */
-    @Volatile internal var longestSilenceMillis = 0L
-        private set
-
     internal fun open() {
         val wsUrl = baseUrl.replaceFirst(Regex("^http", RegexOption.IGNORE_CASE), "ws") + "/clipsocket"
         val request = Request.Builder().url(wsUrl).header("Cookie", session.cookieHeader).build()
