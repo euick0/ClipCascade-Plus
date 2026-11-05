@@ -282,7 +282,8 @@ The owner asked for sensitive clips to last 5 minutes on every device. This is w
 
 ## 12. Later decisions
 
-- **`minSdk` rises from 24 to 26.** `java.util.Base64` needs it, and no intended device is older.
+- **`minSdk` stays 26.** `app/build.gradle` already sets 26, whatever the root `build.gradle` says. `java.util.Base64` needs it.
+- **Package name:** `applicationId` is `com.clipcascade.plus`. The Kotlin namespace stays `com.clipcascade`, to keep the diff against upstream small.
 - **PBKDF2 and SHA3-512 are written against raw bytes in Kotlin**, instead of `PBEKeySpec` (whose password encoding varies by provider) and `MessageDigest` (SHA-3 isn't on older API levels). Both are checked against fixtures from the desktop code.
 - **Integration tests and APK builds belong on GitHub Actions.** A Gradle run with a test server on the 3.7 GB Pi that hosts the real server left under 200 MB free and timed out, so it was stopped.
   - A second attempt, unit tests only with no test server, also dropped below the 250 MB safety limit and was aborted during Gradle configuration. **So `clipcascade-core` has not been compiled or run yet.** Only `generate_fixtures.py` has run. Phase 1 isn't finished until CI passes.

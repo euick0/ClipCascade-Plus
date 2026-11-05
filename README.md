@@ -1,3 +1,9 @@
+> # ClipCascade Plus
+>
+> An unofficial Android fork of [ClipCascade](https://github.com/Sathvik-Rao/ClipCascade) by Sathvik Rao. It aims to stay connected and sync on its own, and it works with the unmodified ClipCascade server and desktop clients. It is not affiliated with or supported by the original project, and it is licensed under GPL-3.0 like the original.
+>
+> **Status: in development, and not tested on a phone yet.** Design notes are in [NOTES.md](NOTES.md). The rest of this README is the original project's.
+
 # <img src="https://github.com/user-attachments/assets/710bb1c3-0eda-48cf-819a-e066bde3a3ec" alt="ClipCascade Logo" width="34" /> ClipCascade
 
 **ClipCascade** is a lightweight, open-source utility that automatically syncs your clipboard across multiple devices—no manual input required. It ensures seamless sharing with robust end-to-end encryption, providing a secure and reliable clipboard experience across workstations.

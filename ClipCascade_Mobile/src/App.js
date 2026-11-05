@@ -356,8 +356,8 @@ export default function App() {
   const LOGOUT_URL = '/logout';
   const CSRF_URL = '/csrf-token';
   const VALIDATE_URL = '/validate-session';
-  const GITHUB_URL = 'https://github.com/Sathvik-Rao/ClipCascade';
-  const APP_NAME = 'ClipCascade';
+  const GITHUB_URL = 'https://github.com/euick0/ClipCascade-Plus';
+  const APP_NAME = 'ClipCascade Plus';
   const HELP_URL = `${GITHUB_URL}/blob/main/README.md`;
   const METADATA_URL =
     'https://raw.githubusercontent.com/Sathvik-Rao/ClipCascade/main/metadata.json';
@@ -1854,9 +1854,9 @@ export default function App() {
                       </View>
                     )}
                     {[
-                      ['1. Allow clipboard monitoring', 'adb -d shell pm grant com.clipcascade android.permission.READ_LOGS', 'Grants READ_LOGS so ClipCascade can detect clipboard access events in Android’s system logs and trigger automatic clipboard monitoring. This does not change how content is received.'],
-                      ['2. Allow drawing over other apps', 'adb -d shell appops set com.clipcascade SYSTEM_ALERT_WINDOW allow', 'Allows ClipCascade to briefly focus a small overlay to read clipboard content when Android restricts background access. You can also grant this permission in Android settings under Drawing over other apps.'],
-                      ['3. Stop the app to apply permissions', 'adb -d shell am force-stop com.clipcascade', 'Stops ClipCascade so it can restart with the new permissions. After running this command, reopen the app and start sync.'],
+                      ['1. Allow clipboard monitoring', 'adb -d shell pm grant com.clipcascade.plus android.permission.READ_LOGS', 'Grants READ_LOGS so ClipCascade can detect clipboard access events in Android’s system logs and trigger automatic clipboard monitoring. This does not change how content is received.'],
+                      ['2. Allow drawing over other apps', 'adb -d shell appops set com.clipcascade.plus SYSTEM_ALERT_WINDOW allow', 'Allows ClipCascade to briefly focus a small overlay to read clipboard content when Android restricts background access. You can also grant this permission in Android settings under Drawing over other apps.'],
+                      ['3. Stop the app to apply permissions', 'adb -d shell am force-stop com.clipcascade.plus', 'Stops ClipCascade so it can restart with the new permissions. After running this command, reopen the app and start sync.'],
                     ].map(([title, command, info]) => (
                       <View key={command} style={styles.adbStep}>
                         <View style={styles.adbStepHeader}>

@@ -6,9 +6,9 @@ import {APP_VERSION} from './AppVersion';
 export const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 const RETRY_INTERVAL = 60 * 60 * 1000;
 const VERSION_URL =
-  'https://raw.githubusercontent.com/Sathvik-Rao/ClipCascade/main/version.json';
+  'https://raw.githubusercontent.com/euick0/ClipCascade-Plus/main/version.json';
 export const RELEASE_URL =
-  'https://github.com/Sathvik-Rao/ClipCascade/releases/latest';
+  'https://github.com/euick0/ClipCascade-Plus/releases/latest';
 export const UPDATE_NOTIFICATION_ID = 'ClipCascade_Update';
 
 export const parseVersion = value => {

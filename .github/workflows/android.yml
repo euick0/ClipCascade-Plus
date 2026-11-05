@@ -1,0 +1,38 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main, 'plus/**']
+    paths:
+      - 'ClipCascade_Mobile/src/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: npm, cache-dependency-path: ClipCascade_Mobile/src/package-lock.json }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Prepare gradle.properties
+        working-directory: ClipCascade_Mobile/src/android
+        run: cp gradle.properties.ci gradle.properties
+      - name: Install JS dependencies
+        working-directory: ClipCascade_Mobile/src
+        run: npm ci
+      - name: Build debug-signed APK for arm64
+        working-directory: ClipCascade_Mobile/src/android
+        run: ./gradlew --no-daemon assembleDebug -PreactNativeArchitectures=arm64-v8a
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clipcascade-plus-debug
+          path: ClipCascade_Mobile/src/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
