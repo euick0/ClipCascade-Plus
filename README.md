@@ -2,7 +2,7 @@
 >
 > An unofficial Android fork of [ClipCascade](https://github.com/Sathvik-Rao/ClipCascade) by Sathvik Rao. It aims to stay connected and sync on its own, and it works with the unmodified ClipCascade server and desktop clients. It is not affiliated with or supported by the original project, and it is licensed under GPL-3.0 like the original.
 >
-> **Status: in development, and not tested on a phone yet.** Design notes are in [NOTES.md](NOTES.md), and the test plan is in [TESTING.md](TESTING.md).
+> **Status: pre-release. Tested on an Android emulator, not yet on a phone.** Design notes are in [NOTES.md](NOTES.md), and the test plan is in [TESTING.md](TESTING.md).
 >
 > **Builds:** each push to `main` builds a signed APK, available from that run in the Actions tab. A `plus-vX.Y.Z` tag also publishes a GitHub Release. The version comes from the tag.
 >

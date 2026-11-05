@@ -296,6 +296,23 @@ The app-op polling and accessibility triggers from section 6.5 are **not built**
 - **Known gap:** after a reboot and before Shizuku is back, automatic capture stays off until the app is opened (section 6.2). This is the plan's Phase 6 reboot test, which will not pass as written. Manual sending still works, and the Shizuku fork with auto-start in section 6.5 is the first thing to try.
 - **Behaviour change:** received files are saved to Downloads straight away, instead of waiting for a tap on a notification.
 
+## 14. Status at v0.1.0
+
+| Phase | State | Evidence |
+|---|---|---|
+| 1 Protocol | Done | CI against the official server image and the desktop client's code |
+| 2 Connection | Built, passes on the emulator | Emulator run: kill, server restart, airplane mode, recents swipe, real reboot |
+| 3 Capture | Built, **Shizuku and keyboard switch untested** | Only the manual path ran end to end. The emulator has no Shizuku |
+| 4 Setup screen | Built | Opens on the emulator. Samsung deep link untested |
+| 5 Release | Done | Signed APK from CI, version from tag |
+| 6 Acceptance | **Needs the phone** | `TESTING.md` |
+
+**Corrections to earlier notes:**
+- Section 7 asked whether a service restarted by Android may call `startForeground` without the battery exemption. The emulator test grants the exemption, so this is still open.
+- CI showed gaps between server frames long enough to trip a 30 s deadline. The cause (Spring's heartbeat timing) is an inference, not something read in the code.
+
+**Not exercised on any device:** the 5-minute expiry timer in the service. The engine logic behind it is tested against the real server.
+
 ## Phase 0 test note
 
 The server test used a temporary container, `clipcascade-recon-tmp`, bound to `127.0.0.1:18091` with default credentials, removed afterwards. The real server container and its data were only read.
