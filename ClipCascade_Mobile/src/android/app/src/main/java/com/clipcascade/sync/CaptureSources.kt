@@ -40,7 +40,11 @@ interface ClipboardSource {
     /** Can this run right now? Rechecked whenever availability may have changed. */
     fun isAvailable(): Boolean
 
-    fun start(onCopy: (RawClip) -> Unit)
+    /**
+     * [onCopy] gets null when the clipboard changed but couldn't be read, for example because the
+     * phone is locked. Android refuses every clipboard read then, even from shell.
+     */
+    fun start(onCopy: (RawClip?) -> Unit)
 
     fun stop()
 
@@ -53,7 +57,7 @@ class ShizukuSource(private val context: Context, private val onAvailabilityChan
     override val name = "Shizuku"
     private val main = Handler(Looper.getMainLooper())
     private val userId = Process.myUid() / 100_000
-    private var onCopy: ((RawClip) -> Unit)? = null
+    private var onCopy: ((RawClip?) -> Unit)? = null
     private var watcher: IClipboardWatcher? = null
     private var failed = false
     private val args = Shizuku.UserServiceArgs(ComponentName(context.packageName, ClipboardUserService::class.java.name))
@@ -89,7 +93,7 @@ class ShizukuSource(private val context: Context, private val onAvailabilityChan
     private val callback = object : IClipChangedCallback.Stub() {
         override fun onClipChanged() {
             val listener = onCopy ?: return
-            readNow()?.let(listener)
+            listener(readNow())
         }
     }
 
@@ -116,7 +120,7 @@ class ShizukuSource(private val context: Context, private val onAvailabilityChan
 
     override fun isAvailable(): Boolean = !failed && isGranted()
 
-    override fun start(onCopy: (RawClip) -> Unit) {
+    override fun start(onCopy: (RawClip?) -> Unit) {
         this.onCopy = onCopy
         runCatching { Shizuku.bindUserService(args, connection) }
             .onFailure { SyncLog.log("Shizuku bind failed: ${it.javaClass.simpleName}") }
@@ -218,19 +222,19 @@ class ImeSwitchSource(private val context: Context) : ClipboardSource {
 
     override fun isAvailable(): Boolean = hasSecureSettings(context)
 
-    override fun start(onCopy: (RawClip) -> Unit) {
+    override fun start(onCopy: (RawClip?) -> Unit) {
         restoreIfInterrupted(context)
         // Android logs its denial line only for apps with a registered listener, so this is what
         // makes the log trigger work. It also fires directly whenever this app has focus.
         listener = ClipboardManager.OnPrimaryClipChangedListener {
-            runCatching { readLocal(context) }.getOrNull()?.let(onCopy)
+            onCopy(runCatching { readLocal(context) }.getOrNull())
         }.also(clipboard::addPrimaryClipChangedListener)
         if (!hasReadLogs(context)) {
             SyncLog.log("Keyboard switch has no trigger: READ_LOGS is not granted")
             return
         }
         trigger = LogcatTrigger {
-            main.post { readNow()?.let(onCopy) }
+            main.post { onCopy(readNow()) }
         }.also { it.start() }
     }
 
@@ -299,7 +303,7 @@ class ImeSwitchSource(private val context: Context) : ClipboardSource {
 class ManualSource : ClipboardSource {
     override val name = "Manual only"
     override fun isAvailable() = true
-    override fun start(onCopy: (RawClip) -> Unit) {}
+    override fun start(onCopy: (RawClip?) -> Unit) {}
     override fun stop() {}
     override fun readNow(): RawClip? = null
 }
