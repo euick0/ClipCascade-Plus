@@ -61,6 +61,7 @@ Record the answers in `NOTES.md`.
 | Swipe from recents | Swipe the app away | Service stays or returns within seconds |
 | Force stop | Settings > Apps > Force stop | **Stays stopped until the app is opened.** This is an Android rule |
 | Content | Copy text, an image and a small file, screen on, in several apps | Each arrives on the PC and the Mac |
+| Copy while locked | Lock the phone, receive an SMS code so the code-copying app copies it, then unlock | Log shows `Clip changed while locked, will send on unlock`, then `Sending the clip copied while locked`. The clip reaches the PC and the Mac right after unlocking |
 | Receiving | Copy text and an image on the PC. Send a file from the PC | Text and image reach the clipboard. The file lands in Downloads |
 | Sensitive expiry | Copy a password on the phone, wait 5 minutes | Cleared on the phone, PC and Mac. If you copied something newer first, that stays |
 | Official clients | Use the unmodified desktop apps throughout | They work as before |

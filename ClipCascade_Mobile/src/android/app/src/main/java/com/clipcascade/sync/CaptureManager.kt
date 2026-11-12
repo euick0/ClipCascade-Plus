@@ -1,9 +1,14 @@
 package com.clipcascade.sync
 
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
+import androidx.core.content.ContextCompat
 import com.clipcascade.AsyncStorageBridge
 import com.clipcascade.plus.core.Clip
 import com.clipcascade.plus.core.ClipType
@@ -20,8 +25,27 @@ class CaptureManager(
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "clip-capture").apply { isDaemon = true } }
     private val shizuku = ShizukuSource(context) { main.post { choose() } }
     private val sources: List<ClipboardSource> = listOf(shizuku, ImeSwitchSource(context), ManualSource())
-    private var active: ClipboardSource? = null
-    private var ignoreUntil = 0L
+    @Volatile private var active: ClipboardSource? = null
+    @Volatile private var ignoreUntil = 0L
+
+    /** A copy happened while the phone was locked, so it's read and sent on the next unlock. */
+    @Volatile private var pendingUnlock = false
+    private val keyguard = context.getSystemService(KeyguardManager::class.java)
+    private val unlockReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!pendingUnlock) return
+            pendingUnlock = false
+            worker.execute {
+                val raw = active?.readNow()
+                if (raw == null) {
+                    SyncLog.log("Could not read the clipboard after unlock")
+                } else {
+                    SyncLog.log("Sending the clip copied while locked")
+                    deliver(raw, manual = false)
+                }
+            }
+        }
+    }
     private val recheck = object : Runnable {
         override fun run() {
             choose()
@@ -32,10 +56,14 @@ class CaptureManager(
     val activeProviderName: String? get() = active?.name
 
     fun start() {
+        ContextCompat.registerReceiver(
+            context, unlockReceiver, IntentFilter(Intent.ACTION_USER_PRESENT), ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         recheck.run()
     }
 
     fun stop() {
+        runCatching { context.unregisterReceiver(unlockReceiver) }
         main.removeCallbacksAndMessages(null)
         active?.stop()
         active = null
@@ -64,9 +92,17 @@ class CaptureManager(
         best.start { raw -> worker.execute { deliver(raw, manual = false) } }
     }
 
-    private fun deliver(raw: RawClip, manual: Boolean) {
+    private fun deliver(raw: RawClip?, manual: Boolean) {
         try {
             if (!manual && System.currentTimeMillis() < ignoreUntil) return
+            if (raw == null) {
+                // Android refuses every clipboard read while locked and sends no event on unlock.
+                if (keyguard?.isDeviceLocked == true && !pendingUnlock) {
+                    pendingUnlock = true
+                    SyncLog.log("Clip changed while locked, will send on unlock")
+                }
+                return
+            }
             if (!isOn("send_clipboard")) return
             val clip = load(raw) ?: return
             if (manual) {
