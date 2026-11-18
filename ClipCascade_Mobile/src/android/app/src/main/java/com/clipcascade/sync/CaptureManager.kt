@@ -54,6 +54,7 @@ class CaptureManager(
     }
 
     val activeProviderName: String? get() = active?.name
+    val activeProviderError: String? get() = active?.lastError
 
     fun start() {
         ContextCompat.registerReceiver(
