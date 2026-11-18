@@ -80,6 +80,19 @@ class SetupActivity : Activity() {
         action("Open Samsung battery settings") { openSamsungBattery() }
 
         heading("Automatic copy capture")
+        // The permission rows can all pass while capture itself fails, so check the method in use.
+        val capture = SyncService.activeCapture
+        val captureError = SyncService.activeCaptureError
+        item(
+            "In use: " + (capture ?: "none"),
+            capture != null && capture != "Manual only" && captureError == null,
+            when {
+                captureError != null -> "Last copy failed ($captureError). Start Shizuku and the app switches to it within a minute."
+                capture == "Shizuku" -> "Copies are sent as soon as they happen."
+                capture == null -> "The service isn't running."
+                else -> "A fallback. Start Shizuku for the most reliable capture."
+            },
+        )
         val shizukuInstalled = runCatching { packageManager.getPackageInfo(SHIZUKU_PACKAGE, 0); true }.getOrDefault(false)
         val shizukuRunning = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
         item("Shizuku installed", shizukuInstalled, "Best capture method.")

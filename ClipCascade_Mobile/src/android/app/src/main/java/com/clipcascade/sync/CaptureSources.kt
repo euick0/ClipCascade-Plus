@@ -50,6 +50,9 @@ interface ClipboardSource {
 
     /** Reads the clipboard now, for "Send clipboard". Null if this provider can't. */
     fun readNow(): RawClip?
+
+    /** Why the last capture attempt failed, or null if it worked. Shown in the setup checklist. */
+    val lastError: String? get() = null
 }
 
 /** Primary: a privileged listener running as shell. No polling and no focus tricks. */
@@ -245,18 +248,28 @@ class ImeSwitchSource(private val context: Context) : ClipboardSource {
         trigger = null
     }
 
+    @Volatile override var lastError: String? = null
+        private set
+
     override fun readNow(): RawClip? {
         val resolver = context.contentResolver
         val previous = Settings.Secure.getString(resolver, Settings.Secure.DEFAULT_INPUT_METHOD)
         if (previous == null) return null
         if (previous == ourIme) return readLocal(context)
         prefs.edit().putString(KEY_PREVIOUS, previous).commit()
+        // Which step threw tells a One UI restriction on writing settings apart from a refused read.
+        var step = "enable keyboard"
         return try {
             enable(resolver)
+            step = "set default keyboard"
             Settings.Secure.putString(resolver, Settings.Secure.DEFAULT_INPUT_METHOD, ourIme)
-            readLocal(context)
+            step = "read clipboard"
+            readLocal(context).also { lastError = null }
         } catch (e: Exception) {
-            SyncLog.log("Keyboard switch failed: ${e.javaClass.simpleName}")
+            // Exception messages name permissions and settings, never clip content.
+            val error = "$step: ${e.javaClass.simpleName}" + e.message?.let { ": " + it.take(300) }.orEmpty()
+            lastError = error
+            SyncLog.log("Keyboard switch failed at $error")
             null
         } finally {
             restoreIfInterrupted(context)

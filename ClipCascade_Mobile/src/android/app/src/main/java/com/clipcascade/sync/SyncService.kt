@@ -385,6 +385,7 @@ class SyncService : Service(), SyncEngineListener {
         val isRunning: Boolean get() = instance != null
         val currentState: SyncState? get() = instance?.engine?.state
         val activeCapture: String? get() = instance?.capture?.activeProviderName
+        val activeCaptureError: String? get() = instance?.capture?.activeProviderError
 
         fun send(context: Context, action: String? = null) {
             val intent = Intent(context, SyncService::class.java).setAction(action)
