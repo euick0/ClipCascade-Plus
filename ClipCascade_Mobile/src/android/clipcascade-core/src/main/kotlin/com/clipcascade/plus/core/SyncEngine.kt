@@ -120,7 +120,10 @@ class SyncEngine(
 
     /** Called by capture providers. Dedupes, then sends now or keeps the clip for reconnection. */
     fun sendClip(clip: Clip) = post {
-        if (!guard.shouldSend(clip.type, clip.content)) return@post
+        if (!guard.shouldSend(clip.type, clip.content)) {
+            listener.log("Copy not sent: same as the last clip (${clip.type.wireName})")
+            return@post
+        }
         transmit(clip)
     }
 
@@ -150,7 +153,9 @@ class SyncEngine(
         val sent = runCatching { connection?.takeIf { it.isOpen }?.send(clip) == true }
             .onFailure { listener.log("Send failed: ${it.javaClass.simpleName}") }
             .getOrDefault(false)
-        if (!sent) {
+        if (sent) {
+            listener.log("Clip sent (${clip.type.wireName})")
+        } else {
             unsent = clip
             listener.log("Clip kept for reconnection (${clip.type.wireName})")
         }
