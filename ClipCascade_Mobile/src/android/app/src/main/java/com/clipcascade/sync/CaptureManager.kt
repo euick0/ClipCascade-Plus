@@ -97,13 +97,20 @@ class CaptureManager(
             if (!manual && System.currentTimeMillis() < ignoreUntil) return
             if (raw == null) {
                 // Android refuses every clipboard read while locked and sends no event on unlock.
-                if (keyguard?.isDeviceLocked == true && !pendingUnlock) {
-                    pendingUnlock = true
-                    SyncLog.log("Clip changed while locked, will send on unlock")
+                if (keyguard?.isDeviceLocked == true) {
+                    if (!pendingUnlock) {
+                        pendingUnlock = true
+                        SyncLog.log("Clip changed while locked, will send on unlock")
+                    }
+                } else {
+                    SyncLog.log("Clipboard changed but ${active?.name ?: "no provider"} could not read it")
                 }
                 return
             }
-            if (!isOn("send_clipboard")) return
+            if (!isOn("send_clipboard")) {
+                SyncLog.log("Copy not sent: sending is turned off in the app")
+                return
+            }
             val clip = load(raw) ?: return
             if (manual) {
                 SyncService.instance?.sendManual(clip, raw.sensitive)
@@ -126,11 +133,17 @@ class CaptureManager(
             return Clip(ClipType.TEXT, text)
         }
         if (raw.isImage) {
-            if (!isOn("enable_image_sharing")) return null
+            if (!isOn("enable_image_sharing")) {
+                SyncLog.log("Image not sent: image sharing is turned off in the app")
+                return null
+            }
             val bytes = readLimited(raw, raw.uris.first(), limit) ?: return null
             return Clip(ClipType.IMAGE, Base64.encodeToString(bytes, Base64.NO_WRAP))
         }
-        if (!isOn("enable_file_sharing")) return null
+        if (!isOn("enable_file_sharing")) {
+            SyncLog.log("File not sent: file sharing is turned off in the app")
+            return null
+        }
         val json = JSONObject()
         var total = 0L
         for (uri in raw.uris) {
